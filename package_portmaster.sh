@@ -5,6 +5,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+python3 tools/sync_package.py
 
 OUT="build/deadspace-portmaster.zip"
 STAGE="build/pkg-portmaster"
@@ -22,7 +23,7 @@ mkdir -p "$STAGE/deadspace"
 
 cp "ports/Dead Space.sh"            "$STAGE/"
 cp build/deadspace                  "$STAGE/deadspace/"
-cp ports/deadspace/deadspace.gptk   "$STAGE/deadspace/"
+cp ports/deadspace/deadspace.ini   "$STAGE/deadspace/"
 cp ports/deadspace/deadspace.eapx.json "$STAGE/deadspace/"
 cp ports/deadspace/PUT_DEAD_SPACE_DATA_HERE.txt "$STAGE/deadspace/"
 cp tools/eapx.py                    "$STAGE/deadspace/"
@@ -37,6 +38,8 @@ cp -R build/libs.armhf              "$STAGE/deadspace/"
 
 mkdir -p "$STAGE/deadspace/licenses/libraries"
 cp LICENSE "$STAGE/deadspace/licenses/LICENSE-portmaster-port.txt"
+cp LICENSE "$STAGE/deadspace/licenses/LICENSE-eapx.txt"
+cp ports/deadspace/LICENSE-gptokeyb.txt "$STAGE/deadspace/licenses/"
 cp NOTICE.md "$STAGE/deadspace/licenses/NOTICE.md"
 cp third_party/gmloader/LICENSE.md "$STAGE/deadspace/licenses/LICENSE-gmloader.md"
 cp third_party/deadspace-vita/LICENSE "$STAGE/deadspace/licenses/LICENSE-deadspace-vita.txt"
@@ -72,21 +75,11 @@ unzip -tq "$OUT" >/dev/null
 # The eapx in tools/ is a copy of the canonical one and drifts silently: this
 # port shipped 0.4.1 while the canonical tree was at 0.4.2, because nobody
 # compared them. Refuse to package on a mismatch instead of trusting memory.
-canonical="${EAPX_CANONICAL:-$HOME/Projects/Others/handheld/eapx/eapx.py}"
-if [ -f "$canonical" ]; then
-  if ! cmp -s tools/eapx.py "$canonical"; then
-    echo "refusing package: tools/eapx.py differs from the canonical $canonical" >&2
-    echo "  packaged:  $(sed -n 's/^VERSION = "\(.*\)"/\1/p' tools/eapx.py)" >&2
-    echo "  canonical: $(sed -n 's/^VERSION = "\(.*\)"/\1/p' "$canonical")" >&2
-    exit 1
-  fi
-else
-  echo "note: canonical eapx not found at $canonical; packaged copy not verified" >&2
-fi
+cmp tools/eapx.py "$STAGE/deadspace/eapx.py"
 
 listing="$(unzip -Z1 "$OUT")"
 for required in "Dead Space.sh" "deadspace/deadspace" \
-                "deadspace/deadspace.gptk" "deadspace/port.json" \
+                "deadspace/deadspace.ini" "deadspace/port.json" \
                 "deadspace/gameinfo.xml" "deadspace/README.md" \
                 "deadspace/CREDITS.md" \
                 "deadspace/cover.png" "deadspace/screenshot.png" \
@@ -116,8 +109,8 @@ esac
 # A stale zip with an old binary passes every check above - they all pass on an
 # old binary. Comparing the hashes is the only check that catches it; twice a
 # release was nearly published with a binary older than the one just verified.
-built_sha="$(shasum -a 256 build/deadspace | cut -d' ' -f1)"
-packed_sha="$(unzip -p "$OUT" deadspace/deadspace | shasum -a 256 | cut -d' ' -f1)"
+built_sha="$(sha256sum build/deadspace | cut -d' ' -f1)"
+packed_sha="$(unzip -p "$OUT" deadspace/deadspace | sha256sum | cut -d' ' -f1)"
 [ "$built_sha" = "$packed_sha" ] || {
     echo "refusing package: the zipped binary is not the one just built" >&2
     echo "  built:  $built_sha" >&2

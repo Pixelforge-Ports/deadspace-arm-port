@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include <SDL2/SDL.h>
+#include "display_config.h"
 
 #include "so_util.h"
 #include "khronos/gles2.h"
@@ -93,8 +94,8 @@ static const char *kNativeLibDir = "lib/armeabi";
 /* The R36S panel. Fixed: the engine asks for the surface size once and the
  * Vita port never calls NativeOnSurfaceChanged, so there is no resize path to
  * exercise. */
-static const int kWidth  = 640;
-static const int kHeight = 480;
+static int kWidth = 640;
+static int kHeight = 480;
 
 /*
  * Walk the module's dynamic symbol table and name every import that nothing
@@ -395,6 +396,7 @@ int main(int argc, char **argv)
          * gl_provider_open() in gles1.cpp decides which library the 190 imports
          * are bound to, and says so in the log.
          */
+        if (!display_config::detect("DEADSPACE", kWidth, kHeight, true)) return 2;
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -445,6 +447,7 @@ int main(int argc, char **argv)
         int window_w = 0, window_h = 0, drawable_w = 0, drawable_h = 0;
         SDL_GetWindowSize(window, &window_w, &window_h);
         SDL_GL_GetDrawableSize(window, &drawable_w, &drawable_h);
+        if (!display_config::drawable("DEADSPACE", drawable_w, drawable_h, kWidth, kHeight, true)) return 2;
         trace("window geometry: logical=%dx%d drawable=%dx%d",
               window_w, window_h, drawable_w, drawable_h);
 
