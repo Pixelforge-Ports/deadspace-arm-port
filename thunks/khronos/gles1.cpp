@@ -50,6 +50,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <SDL2/SDL.h>
 
@@ -101,6 +102,21 @@ bool gl_provider_open(void)
     if (g_gl_provider)
         return true;
 
+    /*
+     * Mesa/Panfrost single-dispatch mode:
+     *
+     * The EGL context was created by Mesa, so GLES1 must come from
+     * SDL_GL_GetProcAddress() rather than from a separately opened
+     * libmali.so.1.
+     */
+    const char *single_dispatch = getenv("DEADSPACE_GL_SINGLE_DISPATCH");
+
+    if (single_dispatch && strcmp(single_dispatch, "1") == 0) {
+        g_gl_provider_name = "SDL/Mesa single-dispatch";
+        trace("GL provider: SDL/Mesa single-dispatch");
+        return true;
+    }
+
     for (int i = 0; kProviders[i]; i++) {
         void *h = dlopen(kProviders[i], RTLD_NOW | RTLD_GLOBAL);
         if (!h)
@@ -130,11 +146,24 @@ bool gl_provider_open(void)
  */
 static void *gl1_resolve(const char *symbol)
 {
+    /*
+     * On Mesa/Panfrost the current EGL/GL context belongs to Mesa.
+     * Do not mix its dispatch table with the firmware's libmali.
+     *
+     * SDL_GL_GetProcAddress() returns the entry point belonging to
+     * the currently active GL context.
+     */
+    const char *single_dispatch = getenv("DEADSPACE_GL_SINGLE_DISPATCH");
+
+    if (single_dispatch && strcmp(single_dispatch, "1") == 0)
+        return SDL_GL_GetProcAddress(symbol);
+
     if (g_gl_provider) {
         void *f = dlsym(g_gl_provider, symbol);
         if (f)
             return f;
     }
+
     return SDL_GL_GetProcAddress(symbol);
 }
 
@@ -159,8 +188,8 @@ void load_gles1_funcs(void)
 
     GLES1_FOREACH(RESOLVE_ONE)
 
-    trace("GLES1 table: %d/%d imports resolved from %s",
-          symtable_gles1_index, 190, g_gl_provider_name);
+    trace("GLES1 table: %d/190 imports resolved from %s",
+          symtable_gles1_index, g_gl_provider_name);
 }
 
 /* How many entries actually made it, for the harness and for main.cpp. */

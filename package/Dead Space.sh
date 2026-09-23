@@ -693,11 +693,19 @@ else
     [ -e "$GL_SHIM/libEGL.so.1" ] && { GL_EGL="$_gldir/libEGL.so.1"; break; }
   done
   if [ -n "$GL_EGL" ]; then
-    GL_READY="y"
-    GL_TIER="mesa"
-    GL_PROVIDER="$GL_EGL"
-    echo "GL: no Mali blob; using the device's 32-bit EGL/GLES set ($GL_EGL)"
-    gl_mesa_unshadow
+	GL_READY="y"
+	GL_TIER="mesa"
+	GL_PROVIDER="$GL_EGL"
+
+	# Mesa/Panfrost owns the current GL context. Force the
+	# fixed-function GLES1 table to use the same driver's
+	# SDL_GL_GetProcAddress() dispatch instead of independently
+	# opening libmali.so.1.
+	export DEADSPACE_GL_SINGLE_DISPATCH=1
+	echo "GL: Mesa/Panfrost selected; forcing GLES1 through SDL single-driver dispatch"
+
+	echo "GL: no Mali blob; using the device's 32-bit EGL/GLES set ($GL_EGL)"
+	gl_mesa_unshadow
   fi
 fi
 
